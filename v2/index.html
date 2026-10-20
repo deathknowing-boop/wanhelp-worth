@@ -5,7 +5,7 @@
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://deathknowing-boop.github.io/wanhelp-worth/v2/a/og.jpg">
 <style>body{margin:0}img{max-width:100%}</style></head><body>
 <title>Wanhelp 身價鑑定機</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;500;700;900&family=Outfit:wght@600;700;800&family=Press+Start+2P&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;700;900&family=Outfit:wght@600;700;800&family=Press+Start+2P&display=swap">
 <style>
 /* 單一淺色主題（街機貼紙風）：粗黑邊、硬投影、歪印章。2.0：首屏街機機台、一題一屏五關、挑戰朋友 */
 :root{
@@ -82,6 +82,8 @@ html.lock,html.lock body{overflow:hidden}
 .crt{position:relative;aspect-ratio:4/3;max-width:100%;border-radius:18px/14px;overflow:hidden;background:#05070C;border:3px solid #0B0E15;
   background-image:radial-gradient(ellipse at 50% 45%,#1C2540 0,#05070C 70%)}
 .crt video,.crt img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block}
+.crt-poster{transition:opacity .45s ease}
+.crt-poster.off{opacity:0}
 .crt::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px),radial-gradient(ellipse at 50% 45%,transparent 60%,rgba(0,0,0,.45) 100%),linear-gradient(160deg,rgba(255,255,255,.09),transparent 36%)}
 .crt-idle{position:absolute;top:0;left:0;right:0;bottom:0;display:grid;place-items:center;text-align:center;color:var(--coin);font-family:var(--f-px);font-size:12px;line-height:2}
@@ -360,7 +362,8 @@ html.lock,html.lock body{overflow:hidden}
       <div class="cab-body">
         <div class="crt" id="crt">
           <div class="crt-idle" aria-hidden="true"><span>WANHELP<br>INSERT COIN</span></div>
-          <video id="heroVid" muted loop playsinline preload="metadata" poster="a/hero-poster.jpg" aria-hidden="true"><source src="a/hero-4x3.mp4" type="video/mp4"></video>
+          <video id="heroVid" muted loop playsinline preload="auto" aria-hidden="true"><source src="a/hero-4x3.mp4" type="video/mp4"></video>
+          <img class="crt-poster" id="heroPoster" src="a/hero-poster.jpg" alt="" aria-hidden="true">
         </div>
       </div>
       <div class="deck">
@@ -727,13 +730,20 @@ function applyHook(){
 }
 function renderHot(){ var box=$("heroChips"); HOT.forEach(function(id){ var b=el("button",{type:"button",text:BY[id].n}); b.onclick=function(){ pickOne(id,"hero"); }; box.appendChild(b); }); }
 function pickOne(id,via){ S.from=null; S.skills=[id]; S.cat=BY[id].c; track("select_skill",{skill:id,via:via}); openGame(2,"已幫你揀咗「"+BY[id].n+"」，可以返上一關改"); }
-var HV=null, HV_SEEN=true;
-function heroPlay(on){ if(!HV) return; if(on&&!REDUCED&&HV_SEEN&&$("game").hidden&&$("sheet").hidden){ var p=HV.play(); if(p&&p.catch) p.catch(function(){}); } else HV.pause(); }
+var HV=null, HV_SEEN=true, HV_SHOWN=false;
+function heroPlay(on){ if(!HV) return; if(on&&!REDUCED&&HV_SEEN&&!document.hidden&&$("game").hidden&&$("sheet").hidden){ var p=HV.play(); if(p&&p.catch) p.catch(function(){}); } else HV.pause(); }
+/* 影片喺海報後面靜靜緩衝，成段載完先淡入：網絡慢嘅時候見到靜態畫面，唔會一頓一頓 */
+function heroReveal(){ if(HV_SHOWN||REDUCED) return; HV_SHOWN=true; try{ HV.currentTime=0; }catch(e){} $("heroPoster").classList.add("off"); heroPlay(true); }
+function heroCheck(){ if(HV_SHOWN||!HV.duration) return; var b=HV.buffered; if(b.length&&b.end(b.length-1)>=HV.duration-.25) heroReveal(); }
 function initHeroVideo(){
   HV=$("heroVid"); if(!HV) return;
+  HV.addEventListener("canplaythrough",heroReveal);
+  HV.addEventListener("progress",heroCheck); HV.addEventListener("timeupdate",heroCheck);
   HV.addEventListener("playing",function(){ HV.parentNode.querySelector(".crt-idle").hidden=true; });
   HV.addEventListener("error",function(){ HV.hidden=true; },true);
+  document.addEventListener("visibilitychange",function(){ heroPlay(true); });
   if("IntersectionObserver" in window){ new IntersectionObserver(function(es){ HV_SEEN=es[0].isIntersecting; heroPlay(true); }).observe($("crt")); }
+  try{ HV.load(); }catch(e){}
   heroPlay(true);
 }
 
